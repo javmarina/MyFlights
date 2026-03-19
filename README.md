@@ -1,3 +1,5 @@
+![Report screenshot](images/screenshot.png)
+
 # MyFlights
 
 Personal flight log tracker. Takes a list of flights, scrapes metadata from flightera.net, and generates a self-contained HTML report with stats and charts.
