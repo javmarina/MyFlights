@@ -1,0 +1,21 @@
+{
+  "flights": [
+    {
+      "number": "IB3163",
+      "date": "2023/06/15",
+      "from": "MAD"
+    },
+    {
+      "number": "VY1234",
+      "date": "2023/09/01",
+      "from": "BCN",
+      "corrected_number": "VY1234"
+    },
+    {
+      "number": "BA456",
+      "date": "2024/01/10",
+      "from": "LHR",
+      "url": "https://www.flightera.net/en/flight/BA456/2024-01-10/LHR"
+    }
+  ]
+}

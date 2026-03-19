@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Statistics Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff; /* Unified white background */
+            --surface-color: #f8f8f8; /* Light gray for cards/sections */
+            --text-main: #111111;
+            --text-light: #666666;
+            --color-primary: #2563eb; /* Royal Blue */
+            --color-secondary: #fb7185; /* Rose Pink (was highlights) */
+            --border-color: #e5e5e5;
+            --font-main: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            --font-display: "Space Grotesk", sans-serif;
+            --font-mono: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 4rem 2rem;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Essential Typography */
+        h1, h3, .stat-label {
+            font-family: var(--font-display);
+            font-weight: 500;
+        }
+
+        h3 {
+            margin-bottom: 1rem;
+        }
+
+        .unit {
+            font-size: 0.7em;
+            color: var(--text-light);
+            font-weight: 400;
+            margin-left: 0.5rem;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0;
+            border-bottom: none; /* Removed underline */
+        }
+
+        .subtitle {
+            font-size: 1.125rem;
+            color: var(--text-light);
+            margin-bottom: 4rem;
+            font-weight: 400;
+        }
+
+        /* Header Layout */
+        header {
+            margin-bottom: 4rem;
+            position: relative;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        h1 {
+            font-size: 4rem;
+            line-height: 1.1;
+            padding-bottom: 0.2em;
+            margin-bottom: 0.3rem;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--color-primary) 50%, var(--color-secondary) 100%);
+            background-size: 200% auto;
+            animation: gradient-anim 3s ease infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            width: fit-content;
+        }
+
+        @keyframes gradient-anim {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        header .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 0;
+            font-weight: 400;
+            max-width: 800px;
+        }
+
+        .print-button {
+            position: absolute;
+            top: 0.5rem;
+            right: 0;
+            background: var(--surface-color);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 100px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .print-button:hover {
+            background: var(--bg-color);
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+        }
+
+        /* Stats Grid - Big Numbers */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-section {
+            margin-bottom: 3rem;
+        }
+        
+        .stats-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            background: var(--surface-color);
+            padding: 1.75rem;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Themed stat cards */
+        .stat-card.theme-blue {
+            background: #eff6ff;
+            border-color: #dbeafe;
+        }
+        
+        .stat-card.theme-green {
+            background: #f0fdf4;
+            border-color: #dcfce7;
+        }
+        
+        .stat-card.theme-purple {
+            background: #faf5ff;
+            border-color: #f3e8ff;
+        }
+        
+        .stat-card.theme-orange {
+            background: #fff7ed;
+            border-color: #ffedd5;
+        }
+        
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: -0.05em;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            word-break: break-word;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-light);
+            letter-spacing: 0;
+            font-family: var(--font-display);
+        }
+
+        /* Sections */
+        .section {
+            background: var(--surface-color); /* Subtle contrast against white body */
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid transparent; /* Cleaner look */
+            border-radius: 8px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+
+        /* Lists & Tables */
+        .list-item {
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .list-item-block {
+            display: block !important;
+        }
+
+        .list-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+
+        strong {
+            font-weight: 600;
+        }
+
+        .badge {
+            background: var(--surface-color);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 100px;
+            font-family: var(--font-display);
+        }
+
+        .badge-transparent {
+            background: transparent;
+            border: none;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-light);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        td {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .flight-info {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        /* Charts */
+        .chart-container, .chart-container-small {
+            position: relative;
+            margin-top: 1.5rem;
+        }
+        
+        .chart-container { height: 300px; }
+        .chart-container-small { height: 100px; }
+
+        /* Highlights */
+        /* Aircraft Highlight Cards */
+        .aircraft-highlights {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .aircraft-card {
+            background: linear-gradient(135deg, white 0%, var(--surface-color) 100%);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--color-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .aircraft-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .aircraft-label {
+            font-family: var(--font-display);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-light);
+            font-weight: 600;
+        }
+
+        .aircraft-age-badge {
+            background: var(--color-secondary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .aircraft-flight-number {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        .aircraft-model {
+            font-size: 0.95rem;
+            color: var(--color-primary);
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .aircraft-details {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        /* Print & Mobile */
+        @media print {
+            @page {
+                size: A4 portrait;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            body {
+                padding: 0;
+                margin: 0;
+                background: white;
+                font-size: 10pt;
+            }
+
+            .container {
+                max-width: 100%;
+                padding: 1.5cm;
+            }
+
+            /* Explicit page breaks for major thematic sections */
+            .page-break-before {
+                break-before: page !important;
+            }
+
+            .section, .stats-section {
+                box-shadow: none !important;
+                border: 1px solid #e5e5e5 !important;
+                padding: 1rem !important;
+                margin: 0 0 0.75rem 0 !important;
+            }
+
+            .stat-card, .aircraft-card, .route-card, .airport-card {
+                break-inside: avoid;
+            }
+
+            /* Hide interactive / non-print elements */
+            .print-button { display: none !important; }
+            .map-btn { display: none !important; }
+            .no-print { display: none !important; }
+            .show-more-container { display: none !important; }
+            #worldMap { display: none !important; }
+            .modal { display: none !important; }
+
+            /* Show static map placeholder */
+            .print-map-placeholder {
+                display: block !important;
+                text-align: center;
+                padding: 0.75rem 1rem;
+                color: #666;
+                font-style: italic;
+                border: 1px dashed #ccc;
+                border-radius: 6px;
+                margin: 0.5rem 0 1rem 0;
+                font-size: 0.85em;
+            }
+
+            header {
+                margin-bottom: 2rem;
+                border-bottom: none;
+            }
+
+            /* Fix gradient title for print */
+            h1 {
+                -webkit-text-fill-color: #111111 !important;
+                color: #111111 !important;
+                background: none !important;
+                animation: none !important;
+                font-size: 2.5rem !important;
+            }
+
+            .subtitle {
+                color: #666666 !important;
+            }
+
+            /* Grid layouts */
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr) !important;
+            }
+
+            .grid-2 {
+                grid-template-columns: 1fr 1fr !important;
+                break-inside: avoid;
+            }
+
+            .route-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            .airport-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            .month-grid {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+
+            .aircraft-highlights {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+
+            /* Charts */
+            .chart-container {
+                height: 280px !important;
+                width: 100% !important;
+                break-inside: avoid;
+            }
+
+            .chart-container-small {
+                height: 80px !important;
+                width: 100% !important;
+                break-inside: avoid;
+            }
+
+            canvas { max-width: 100% !important; }
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            h1 { font-size: 2.25rem; }
+            .stat-value { font-size: 2.5rem; }
+            body { padding: 1.5rem; }
+        }
+        
+        .loading, .error {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-light);
+        }
+        .error { color: var(--color-secondary); }
+
+        .empty-message {
+            color: var(--text-light);
+            padding: 1rem 0;
+        }
+
+        /* Emoji flags as images */
+        #countriesList img.emoji {
+            height: 2rem;
+            width: 2rem;
+            margin: 0 0.5rem;
+            vertical-align: middle;
+        }
+
+        /* World Map Container */
+        #worldMap {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        /* Modern Route Cards */
+        .route-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .route-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .route-name {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        .route-count {
+            font-family: var(--font-display);
+            color: var(--color-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .route-bar {
+            height: 6px;
+            background: var(--surface-color);
+            border-radius: 3px;
+            margin-top: 0.75rem;
+            overflow: hidden;
+        }
+
+        .route-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+            transition: width 0.6s ease;
+        }
+
+        /* Airport Cards */
+        .airport-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .airport-card {
+            background: white;
+            padding: 1.25rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .airport-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--surface-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--color-primary);
+            flex-shrink: 0;
+        }
+
+        .airport-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .airport-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 0.25rem;
+        }
+
+        .airport-visits {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .airport-visits strong {
+            color: var(--color-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Month Cards */
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .month-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .month-name {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        .month-count {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+
+        /* Show More Button */
+        .show-more-container {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+
+        .show-more-btn {
+            background: var(--surface-color);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 2rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 100px;
+            font-family: var(--font-display);
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .show-more-btn:hover {
+            background: var(--bg-color);
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .screen-hidden {
+            display: none;
+        }
+
+        .print-map-placeholder {
+            display: none;
+        }
+        
+        .print-tip {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        .print-tip.visible {
+            display: flex;
+        }
+
+        /* Map Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 1000px;
+            height: 80vh;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .modal-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            line-height: 1;
+        }
+        
+        #flightMap {
+            flex: 1;
+            width: 100%;
+            background: #f0f0f0;
+        }
+        
+        .map-btn {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--color-primary);
+            border: none;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-left: 0.75rem;
+            font-family: var(--font-display);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+        
+        .map-btn:hover {
+            background: var(--color-primary);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Flight Statistics Dashboard</h1>
+            <div class="subtitle">A comprehensive breakdown of your travel history and achievements.</div>
+            <!-- <button class="print-button" onclick="window.print()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2-2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                <span>Export Report</span>
+            </button>
+            <div class="print-tip no-print">&#9432;&nbsp; In Chrome's print dialog, uncheck <strong>Headers and footers</strong> to remove the date &amp; URL from the PDF.</div> -->
+        </header>
+
+        <div id="loading" class="loading">Loading flight statistics...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="content" style="display: none;">
+            
+            <!-- Primary Travel Stats -->
+            <div class="stats-section">
+                <div class="stats-section-title">Travel Overview</div>
+                <div class="stats-grid">
+                    <div class="stat-card theme-blue">
+                        <div class="stat-value"><span id="total-distance">0</span><span class="unit">km</span></div>
+                        <div class="stat-label">Total Distance</div>
+                    </div>
+                    <div class="stat-card theme-blue">
+                        <div class="stat-value" id="total-flights">0</div>
+                        <div class="stat-label">Total Flights</div>
+                    </div>
+                    <div class="stat-card theme-blue">
+                        <div class="stat-value"><span id="total-hours">0</span><span class="unit">hours</span></div>
+                        <div class="stat-label">Hours in the Air</div>
+                    </div>
+                    <div class="stat-card theme-blue">
+                        <div class="stat-value" id="unique-airlines">0</div>
+                        <div class="stat-label">Airlines Used</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Destinations Stats -->
+            <div class="stats-section">
+                <div class="stats-section-title">Destinations</div>
+                <div class="stats-grid">
+                    <div class="stat-card theme-green">
+                        <div class="stat-value" id="unique-airports">0</div>
+                        <div class="stat-label">Airports Visited</div>
+                    </div>
+                    <div class="stat-card theme-green">
+                        <div class="stat-value" id="unique-routes">0</div>
+                        <div class="stat-label">Unique Routes</div>
+                    </div>
+                    <div class="stat-card theme-green">
+                        <div class="stat-value" id="countries-count">0</div>
+                        <div class="stat-label">Countries Visited</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights & Fun Facts -->
+            <div class="stats-section">
+                <div class="stats-section-title">Insights</div>
+                <div class="stats-grid">
+                    <div class="stat-card theme-purple">
+                        <div class="stat-value"><span id="avg-distance">0</span><span class="unit">km</span></div>
+                        <div class="stat-label">Average Distance</div>
+                    </div>
+                    <div class="stat-card theme-purple">
+                        <div class="stat-value"><span id="avg-speed">0</span><span class="unit">km/h</span></div>
+                        <div class="stat-label">Average Speed</div>
+                    </div>
+                    <div class="stat-card theme-orange">
+                        <div class="stat-value" id="moon-trips">0</div>
+                        <div class="stat-label">Moon Trips Equivalent</div>
+                    </div>
+                    <div class="stat-card theme-orange">
+                        <div class="stat-value"><span id="avg-plane-age">N/A</span><span class="unit">years</span></div>
+                        <div class="stat-label">Average Plane Age</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airlines Chart -->
+            <div class="section">
+                <h2>Airlines Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="airlinesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Aircraft Families -->
+            <div class="section">
+                <h2>Aircraft Families</h2>
+                <div class="chart-container">
+                    <canvas id="familiesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Countries & Geography -->
+            <div class="section page-break-before">
+                <h2>Geographic Coverage</h2>
+                
+                <!-- World Map -->
+                <div id="worldMap"></div>
+                <div class="print-map-placeholder">Interactive world map — open in browser to view</div>
+                
+                <div class="grid-2" style="margin-top: 2rem;">
+                    <div>
+                        <h3>Countries Visited (<span id="countries-count">0</span>)</h3>
+                        <div id="countriesList" style="line-height: 2.5; font-size: 2rem; font-family: 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif; letter-spacing: 0.5rem;"></div>
+                    </div>
+                    <div>
+                        <h3>Key Statistics</h3>
+                        <div class="list-item">
+                            <strong>Continents</strong>
+                            <span id="continents-list">-</span>
+                        </div>
+                        <div class="list-item">
+                            <strong>International Flights</strong>
+                            <span id="international-flights">-</span>
+                        </div>
+                        <div class="list-item">
+                            <strong>Domestic Flights</strong>
+                            <span id="domestic-flights">-</span>
+                        </div>
+                        <div class="list-item">
+                            <strong>Home Departure Airport</strong>
+                            <span id="home-departure">-</span>
+                        </div>
+                        <div class="list-item">
+                            <strong>Home Arrival Airport</strong>
+                            <span id="home-arrival">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aircraft Analysis -->
+            <div class="section">
+                <h2>Aircraft Analysis</h2>
+                <div style="margin-bottom: 2rem;">
+                    <h3>Manufacturer Distribution</h3>
+                    <div class="chart-container-small">
+                        <canvas id="manufacturerChart"></canvas>
+                    </div>
+                </div>
+                <div>
+                    <h3>Aircraft Type Distribution</h3>
+                    <div class="chart-container-small">
+                        <canvas id="aircraftTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Airline Alliances -->
+            <div class="section">
+                <h2>Airline Alliances</h2>
+                <div class="chart-container">
+                    <canvas id="alliancesChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Milestones & Records -->
+            <div class="section page-break-before">
+                <h2>Milestones & Records</h2>
+                <div class="grid-2">
+                    <div>
+                        <div class="list-item list-item-block">
+                            <div class="list-item-header">
+                                <strong>First Flight Ever</strong>
+                            </div>
+                            <div class="flight-info" id="first-flight">-</div>
+                        </div>
+                        <div class="list-item list-item-block">
+                            <div class="list-item-header">
+                                <strong>100th Flight Milestone</strong>
+                            </div>
+                            <div class="flight-info" id="flight-100">-</div>
+                        </div>
+                        <div class="list-item list-item-block">
+                            <div class="list-item-header">
+                                <strong>Most Recent Flight</strong>
+                            </div>
+                            <div class="flight-info" id="recent-flight">-</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="list-item list-item-block">
+                            <div class="list-item-header">
+                                <strong>Longest Travel Break</strong>
+                            </div>
+                            <div class="flight-info" id="longest-gap">-</div>
+                        </div>
+                        <div class="list-item list-item-block">
+                            <div class="list-item-header">
+                                <strong>Fastest Turnaround</strong>
+                            </div>
+                            <div class="flight-info" id="fastest-turnaround">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flights per Year and Month -->
+            <div class="grid-2">
+                <div class="section">
+                    <h2>Flights per Year</h2>
+                    <div class="chart-container">
+                        <canvas id="yearChart"></canvas>
+                    </div>
+                </div>
+                <div class="section">
+                    <h2>Distance per Year (km)</h2>
+                    <div class="chart-container">
+                        <canvas id="distanceYearChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flights per Month -->
+            <div class="section">
+                <h2>Flights per Month (All Time)</h2>
+                <div class="chart-container">
+                    <canvas id="monthChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Flight Durations -->
+            <div class="section page-break-before" id="durationSection">
+                <h2>Flight Durations</h2>
+                <div class="chart-container">
+                    <canvas id="durationChart"></canvas>
+                </div>
+
+                <div class="grid-2" style="margin-top: 2rem;">
+                    <div>
+                        <h3>Longest Flights</h3>
+                        <div id="longestFlights"></div>
+                    </div>
+                    <div>
+                        <h3>Shortest Flights</h3>
+                        <div id="shortestFlights"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plane Age -->
+            <div class="section page-break-before" id="planeAgeSection">
+                <h2>Aircraft Age Analysis</h2>
+                
+                <div class="aircraft-highlights" id="planeAgeHighlights"></div>
+
+                <div class="grid-2">
+                    <div>
+                        <h3>Age at Time of Flight</h3>
+                        <div class="chart-container">
+                            <canvas id="planeAgeChart"></canvas>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>Manufacturing Year</h3>
+                        <div class="chart-container">
+                            <canvas id="manufacturingChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Routes -->
+            <div class="section">
+                <h2>Most Frequent Routes</h2>
+                <div class="route-grid" id="routesList"></div>
+                <div class="show-more-container" id="routesShowMore" style="display: none;">
+                    <button class="show-more-btn" onclick="showMoreRoutes()">Show More Routes</button>
+                </div>
+            </div>
+
+            <!-- Top Airports -->
+            <div class="section">
+                <h2>Most Visited Airports</h2>
+                <div class="airport-grid" id="airportsTable"></div>
+                <div class="show-more-container" id="airportsShowMore" style="display: none;">
+                    <button class="show-more-btn" onclick="showMoreAirports()">Show More Airports</button>
+                </div>
+            </div>
+
+            <!-- Repeated Aircraft -->
+            <div class="section" id="repeatedAircraftSection">
+                <h2>Repeated Aircraft</h2>
+                <div id="repeatedAircraftList"></div>
+            </div>
+
+            <!-- Top Months -->
+            <div class="section">
+                <h2>Busiest Months (Historical)</h2>
+                <div class="month-grid" id="topMonthsList"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Map Modal -->
+    <div id="mapModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modalFlightNumber" class="modal-title">Flight Map</h3>
+                    <p id="modalRoute" class="modal-subtitle"></p>
+                </div>
+                <button class="close-button" onclick="closeMap()">&times;</button>
+            </div>
+            <div id="flightMap"></div>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js default configuration
+        Chart.defaults.font.family = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+        Chart.defaults.color = '#333333';
+        Chart.defaults.borderColor = '#e5e5e5';
+
+        // Color palette - Vibrant & Modern
+        const colors = [
+            '#2563eb', '#fb7185', '#34d399', '#f59e0b', '#8b5cf6',
+            '#06b6d4', '#f97316', '#ec4899', '#6366f1', '#84cc16'
+        ];
+        
+        const accentColor = '#2563eb';
+        const highlightColor = '#fb7185';
+        
+        let map = null;
+        let worldMap = null;
+        let countriesGeoJSON = null;
+
+        // ========== HELPER FUNCTIONS ==========
+        
+        function closeMap() {
+            document.getElementById('mapModal').style.display = 'none';
+        }
+
+        // Create Chart.js chart with common defaults
+        function createChart(elementId, type, data, customOptions = {}) {
+            const ctx = document.getElementById(elementId);
+            if (!ctx) return null;
+            
+            const defaultOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: type !== 'doughnut' && type !== 'pie' ? {
+                    y: { beginAtZero: true, grid: { display: true, drawBorder: false } },
+                    x: { grid: { display: false } }
+                } : undefined
+            };
+            
+            return new Chart(ctx, {
+                type,
+                data,
+                options: { ...defaultOptions, ...customOptions }
+            });
+        }
+
+        // Render flight item with optional map button
+        function renderFlightItem(flight) {
+            let mapButton = '';
+            if (flight.coords_from && flight.coords_to) {
+                const coordsFromStr = JSON.stringify(flight.coords_from);
+                const coordsToStr = JSON.stringify(flight.coords_to);
+                mapButton = `<button class="map-btn" onclick='showMap(${coordsFromStr}, ${coordsToStr}, "${flight.iata_from}", "${flight.iata_to}", "${flight.flight_number}")'>VIEW MAP</button>`;
+            }
+
+            return `
+                <div>
+                    <strong>${flight.flight_number}</strong> (${flight.aircraft_model}) ${mapButton}
+                    <div class="flight-info">${flight.route} • ${flight.date}</div>
+                </div>
+                <span class="badge">${flight.duration_text}</span>
+            `;
+        }
+
+        // Generic show more handler — renders all items in DOM so print shows everything
+        function createShowMoreHandler(allItems, containerEl, showMoreContainerEl, renderFunction) {
+            const PAGE_SIZE = 6;
+
+            // Render all items into the DOM now
+            containerEl.innerHTML = '';
+            allItems.forEach((item, index) => {
+                renderFunction(item, containerEl);
+                // Mark items beyond the first page as screen-only hidden
+                if (index >= PAGE_SIZE && containerEl.lastElementChild) {
+                    containerEl.lastElementChild.classList.add('screen-hidden');
+                }
+            });
+
+            showMoreContainerEl.style.display = allItems.length > PAGE_SIZE ? 'block' : 'none';
+
+            return function() {
+                containerEl.querySelectorAll('.screen-hidden').forEach(el => el.classList.remove('screen-hidden'));
+                showMoreContainerEl.style.display = 'none';
+            };
+        }
+
+        // Calculate intermediate points for a Great Circle path
+        function getGeodesicPath(start, end, numPoints = 100) {
+            const lat1 = start[0] * Math.PI / 180;
+            const lon1 = start[1] * Math.PI / 180;
+            const lat2 = end[0] * Math.PI / 180;
+            const lon2 = end[1] * Math.PI / 180;
+
+            const d = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
+                Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)));
+
+            const points = [];
+            for (let i = 0; i <= numPoints; i++) {
+                const f = i / numPoints;
+                const A = Math.sin((1 - f) * d) / Math.sin(d);
+                const B = Math.sin(f * d) / Math.sin(d);
+                
+                const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+                const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+                const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+                
+                const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+                const lon = Math.atan2(y, x);
+                
+                points.push([lat * 180 / Math.PI, lon * 180 / Math.PI]);
+            }
+            return points;
+        }
+
+        function showMap(coordsFrom, coordsTo, iataFrom, iataTo, flightNum) {
+            document.getElementById('mapModal').style.display = 'block';
+            document.getElementById('modalFlightNumber').innerText = `Flight ${flightNum}`;
+            document.getElementById('modalRoute').innerText = `${iataFrom} ⟶ ${iataTo}`;
+
+            // Prevent map container from retaining old map instance
+            if (map) {
+                map.off();
+                map.remove();
+            }
+
+            // Initialize map
+            // Use a clean, minimal map style (CartoDB Positron)
+            map = L.map('flightMap');
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 19
+            }).addTo(map);
+
+            const latlngs = [
+                coordsFrom,
+                coordsTo
+            ];
+
+            const bounds = L.latLngBounds(latlngs);
+            
+            // Markers
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: "<div style='background-color:#2563eb; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;'></div>",
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+            
+            L.marker(coordsFrom, { icon: icon }).addTo(map).bindPopup(`<b>${iataFrom}</b> (Origin)`).openPopup();
+            L.marker(coordsTo, { icon: icon }).addTo(map).bindPopup(`<b>${iataTo}</b> (Dest)`);
+
+            // Polyline - Geodesic Curve
+            try {
+                // Generate points along the great circle path
+                const pathPoints = getGeodesicPath(coordsFrom, coordsTo, 100);
+                
+                L.polyline(pathPoints, {
+                    color: '#2563eb', // Matches our accent color
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '5, 10',
+                    lineCap: 'round'
+                }).addTo(map);
+            } catch (e) {
+                // Fallback to straight line if calculation fails
+                L.polyline(latlngs, {
+                    color: '#2563eb',
+                    weight: 3,
+                    opacity: 0.8,
+                    dashArray: '5, 10'
+                }).addTo(map);
+            }
+
+            map.fitBounds(bounds, { padding: [50, 50] });
+            
+            // Invalidate size after modal shows to fix rendering issues
+            setTimeout(() => {
+                map.invalidateSize();
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }, 100);
+        }
+
+        async function loadStats() {
+            try {
+                let stats;
+                if (typeof STATS_DATA !== 'undefined') {
+                    // Use pre-inlined data (standalone report.html)
+                    stats = STATS_DATA;
+                } else {
+                    const response = await fetch('stats_data.json');
+                    if (!response.ok) {
+                        throw new Error('Failed to load stats_data.json. Make sure to run the export script first.');
+                    }
+                    stats = await response.json();
+                }
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+                renderStats(stats);
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = `Error: ${error.message}`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function renderStats(stats) {
+            // Summary stats - Use pre-formatted display values
+            const statMappings = [
+                { id: 'total-distance', value: stats.total_distance_display || '0' },
+                { id: 'total-flights', value: stats.total_flights || 0 },
+                { id: 'total-hours', value: stats.total_flight_hours || 0 },
+                { id: 'unique-airports', value: stats.airports?.unique_count || 0 },
+                { id: 'unique-routes', value: stats.unique_routes || 0 },
+                { id: 'unique-airlines', value: stats.airlines?.unique_count || 0 },
+                { id: 'avg-distance', value: stats.average_distance_display || '0' },
+                { id: 'avg-speed', value: stats.average_speed_kmh || 0 },
+                { id: 'moon-trips', value: stats.moon_trips || 0 },
+                { id: 'avg-plane-age', value: stats.average_plane_age || 'N/A' }
+            ];
+            statMappings.forEach(({ id, value }) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            });
+
+            // Countries list with flags
+            if (stats.countries_visited) {
+                document.getElementById('countries-count').textContent = stats.countries_visited.count;
+                // Use Twemoji to render emojis as images for cross-platform support
+                const flags = stats.countries_visited.list.map(c => c.flag).join(' ');
+                const countriesDiv = document.getElementById('countriesList');
+                countriesDiv.innerHTML = flags;
+                // Parse emojis into images
+                if (typeof twemoji !== 'undefined') {
+                    twemoji.parse(countriesDiv, {
+                        folder: 'svg',
+                        ext: '.svg'
+                    });
+                }
+                
+                // Initialize world map
+                if (worldMap) {
+                    worldMap.off();
+                    worldMap.remove();
+                }
+                
+                worldMap = L.map('worldMap', {
+                    center: [30, 0],
+                    zoom: 2,
+                    minZoom: 1,
+                    maxZoom: 6,
+                    scrollWheelZoom: false
+                });
+                
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap contributors',
+                    subdomains: 'abcd'
+                }).addTo(worldMap);
+                
+                // Load and display countries GeoJSON
+                fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+                    .then(response => response.json())
+                    .then(data => {
+                        countriesGeoJSON = data;
+                        
+                        // Create a set of visited country ISO codes for fast lookup
+                        const visitedCountryISOs = new Set(stats.countries_visited.list.map(c => c.iso_code));
+                        const visitedCountryNames = new Set(stats.countries_visited.list.map(c => c.name.toLowerCase()));
+                        
+                        // Debug: Check what properties France has
+                        const franceFeature = data.features.find(f => 
+                            f.properties.ADMIN === 'France' || 
+                            f.properties.name === 'France' ||
+                            f.properties.NAME === 'France'
+                        );
+                        if (franceFeature) {
+                            console.log('France properties:', franceFeature.properties);
+                        }
+                        
+                        // Function to get visited country data by ISO code or name
+                        function getVisitedCountryByISO(isoCode) {
+                            if (!isoCode) return null;
+                            return stats.countries_visited.list.find(c => c.iso_code === isoCode.toUpperCase());
+                        }
+                        
+                        function getVisitedCountryByName(name) {
+                            if (!name) return null;
+                            return stats.countries_visited.list.find(c => c.name.toLowerCase() === name.toLowerCase());
+                        }
+                        
+                        // Add all countries to map
+                        L.geoJSON(data, {
+                            style: function(feature) {
+                                // Get ISO code from GeoJSON properties - try multiple property names
+                                const isoCode = feature.properties['ISO3166-1-Alpha-2'] || 
+                                               feature.properties.ISO_A2 || 
+                                               feature.properties.iso_a2 ||
+                                               feature.properties.ISO ||
+                                               feature.properties.iso ||
+                                               feature.properties.ADM0_A3?.substring(0, 2) ||
+                                               feature.id;
+                                
+                                const countryName = feature.properties.name || feature.properties.ADMIN || feature.properties.NAME;
+                                
+                                // Check if visited by ISO code or by name (fallback for countries with invalid ISO like "-99")
+                                const isVisitedByISO = isoCode && isoCode !== '-99' && visitedCountryISOs.has(isoCode.toUpperCase());
+                                const isVisitedByName = countryName && visitedCountryNames.has(countryName.toLowerCase());
+                                const isVisited = isVisitedByISO || isVisitedByName;
+                                
+                                return {
+                                    fillColor: isVisited ? '#2563eb' : '#f0f0f0',
+                                    fillOpacity: isVisited ? 0.7 : 0.2,
+                                    color: isVisited ? '#1e40af' : '#d0d0d0',
+                                    weight: isVisited ? 2 : 0.5,
+                                    opacity: 1
+                                };
+                            },
+                            onEachFeature: function(feature, layer) {
+                                const isoCode = feature.properties['ISO3166-1-Alpha-2'] || 
+                                               feature.properties.ISO_A2 || 
+                                               feature.properties.iso_a2 ||
+                                               feature.properties.ISO ||
+                                               feature.properties.iso ||
+                                               feature.properties.ADM0_A3?.substring(0, 2) ||
+                                               feature.id;
+                                const countryName = feature.properties.name || feature.properties.ADMIN || feature.properties.NAME;
+                                
+                                // Try to find by ISO code first, then by name
+                                let visitedCountry = null;
+                                if (isoCode && isoCode !== '-99') {
+                                    visitedCountry = getVisitedCountryByISO(isoCode?.toUpperCase());
+                                }
+                                if (!visitedCountry && countryName) {
+                                    visitedCountry = getVisitedCountryByName(countryName);
+                                }
+                                
+                                if (visitedCountry) {
+                                    layer.bindPopup(`<b>${visitedCountry.flag} ${visitedCountry.name}</b><br><small>${visitedCountry.iso_code}</small>`);
+                                    
+
+                                    // Add hover effect
+                                    layer.on('mouseover', function() {
+                                        this.setStyle({
+                                            fillOpacity: 0.85,
+                                            weight: 2.5,
+                                            color: '#1e40af'
+                                        });
+                                    });
+                                    
+
+                                    layer.on('mouseout', function() {
+                                        this.setStyle({
+                                            fillOpacity: 0.6,
+                                            weight: 1.5,
+                                            color: '#1e40af'
+                                        });
+                                    });
+                                }
+                            }
+                        }).addTo(worldMap);
+                    })
+                    .catch(error => {
+                        console.error('Error loading countries GeoJSON:', error);
+                        // Fallback: just show a simple message
+                        document.getElementById('worldMap').innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-light);">Map data could not be loaded</div>';
+                    });
+            }
+
+            // Continents
+            if (stats.continents_visited) {
+                document.getElementById('continents-list').textContent = stats.continents_visited.list.join(', ');
+            }
+
+            // Domestic vs International
+            if (stats.domestic_vs_international) {
+                document.getElementById('international-flights').textContent = 
+                    `${stats.domestic_vs_international.international} (${(100 - stats.domestic_vs_international.domestic_percentage).toFixed(1)}%)`;
+                document.getElementById('domestic-flights').textContent = 
+                    `${stats.domestic_vs_international.domestic} (${stats.domestic_vs_international.domestic_percentage}%)`;
+            }
+
+            // Home airports
+            if (stats.home_airports) {
+                document.getElementById('home-departure').textContent = 
+                    `${stats.home_airports.most_frequent_departure.iata} - ${stats.home_airports.most_frequent_departure.name} (${stats.home_airports.most_frequent_departure.count} flights)`;
+                document.getElementById('home-arrival').textContent = 
+                    `${stats.home_airports.most_frequent_arrival.iata} - ${stats.home_airports.most_frequent_arrival.name} (${stats.home_airports.most_frequent_arrival.count} flights)`;
+            }
+
+            // Boeing vs Airbus - Single Stacked Horizontal Bar
+            if (stats.boeing_vs_airbus) {
+                new Chart(document.getElementById('manufacturerChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Manufacturers'],
+                        datasets: [
+                            {
+                                label: 'Boeing',
+                                data: [stats.boeing_vs_airbus.boeing],
+                                backgroundColor: colors[0],
+                                borderWidth: 0
+                            },
+                            {
+                                label: 'Airbus',
+                                data: [stats.boeing_vs_airbus.airbus],
+                                backgroundColor: colors[1],
+                                borderWidth: 0
+                            },
+                            {
+                                label: 'Other',
+                                data: [stats.boeing_vs_airbus.other],
+                                backgroundColor: colors[3],
+                                borderWidth: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: { padding: 15, usePointStyle: true, pointStyle: 'rect' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = stats.total_flights;
+                                        const percentage = ((context.parsed.x / total) * 100).toFixed(1);
+                                        return `${context.dataset.label}: ${context.parsed.x} flights (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                beginAtZero: true,
+                                grid: { display: true, drawBorder: false },
+                                ticks: { stepSize: 10 }
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { display: false },
+                                barThickness: 40
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Widebody vs Narrowbody - Single Stacked Horizontal Bar
+            if (stats.widebody_vs_narrowbody) {
+                new Chart(document.getElementById('aircraftTypeChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Aircraft Type'],
+                        datasets: [
+                            {
+                                label: 'Widebody',
+                                data: [stats.widebody_vs_narrowbody.widebody],
+                                backgroundColor: colors[4],
+                                borderWidth: 0
+                            },
+                            {
+                                label: 'Narrowbody',
+                                data: [stats.widebody_vs_narrowbody.narrowbody],
+                                backgroundColor: colors[2],
+                                borderWidth: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: { padding: 15, usePointStyle: true, pointStyle: 'rect' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = stats.widebody_vs_narrowbody.widebody + stats.widebody_vs_narrowbody.narrowbody;
+                                        const percentage = ((context.parsed.x / total) * 100).toFixed(1);
+                                        return `${context.dataset.label}: ${context.parsed.x} flights (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                                beginAtZero: true,
+                                grid: { display: true, drawBorder: false },
+                                ticks: { stepSize: 10 }
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { display: false },
+                                barThickness: 20
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Milestones - Use pre-formatted display HTML
+            const milestones = [
+                { id: 'first-flight', html: stats.first_flight_display },
+                { id: 'flight-100', html: stats.flight_100_display },
+                { id: 'recent-flight', html: stats.most_recent_flight_display },
+                { id: 'longest-gap', html: stats.longest_gap?.days ? 
+                    `${stats.longest_gap.days} days<br>Between ${stats.longest_gap.flight_before.flight_number} (${stats.longest_gap.flight_before.date}) and ${stats.longest_gap.flight_after.flight_number} (${stats.longest_gap.flight_after.date})` : null },
+                { id: 'fastest-turnaround', html: stats.fastest_turnaround?.hours ?
+                    `${stats.fastest_turnaround.hours} hours<br>Between ${stats.fastest_turnaround.flight1.flight_number} and ${stats.fastest_turnaround.flight2.flight_number}` : null }
+            ];
+            milestones.forEach(({ id, html }) => {
+                const el = document.getElementById(id);
+                if (el && html) el.innerHTML = html;
+            });
+
+            // Airlines Chart
+            if (stats.airlines) {
+                createChart('airlinesChart', 'doughnut', {
+                    labels: stats.airlines.labels.map((name, i) => `${name} (${stats.airlines.iata_codes[i]})`),
+                    datasets: [{ data: stats.airlines.values, backgroundColor: colors, borderWidth: 0 }]
+                }, {
+                    cutout: '60%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: { padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'rect' }
+                        }
+                    }
+                });
+            }
+
+            // Aircraft Families Chart
+            if (stats.aircraft_families) {
+                createChart('familiesChart', 'pie', {
+                    labels: stats.aircraft_families.labels.map((name, i) => `${name} (${stats.aircraft_families.values[i]} flights)`),
+                    datasets: [{ data: stats.aircraft_families.values, backgroundColor: colors, borderWidth: 0 }]
+                }, {
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: { padding: 20, font: { size: 12 }, usePointStyle: true, pointStyle: 'rect' }
+                        }
+                    }
+                });
+            }
+
+            // Airline Alliances Chart
+            if (stats.airline_alliances) {
+                createChart('alliancesChart', 'bar', {
+                    labels: ['Star Alliance', 'SkyTeam', 'Oneworld', 'None'],
+                    datasets: [{
+                        label: 'Flights',
+                        data: [stats.airline_alliances.star_alliance, stats.airline_alliances.skyteam,
+                               stats.airline_alliances.oneworld, stats.airline_alliances.none],
+                        backgroundColor: [colors[0], colors[1], colors[2], colors[5]],
+                        borderWidth: 0,
+                        borderRadius: 8
+                    }]
+                }, { scales: { y: { ticks: { stepSize: 1 } } } });
+            }
+
+            // Flights per Year
+            if (stats.flights_per_year) {
+                createChart('yearChart', 'bar', {
+                    labels: stats.flights_per_year.labels,
+                    datasets: [{
+                        label: 'Flights',
+                        data: stats.flights_per_year.values,
+                        backgroundColor: accentColor,
+                        barPercentage: 0.6
+                    }]
+                }, { scales: { y: { ticks: { stepSize: 1 } } } });
+            }
+
+            // Distance per Year
+            if (stats.distance_per_year) {
+                createChart('distanceYearChart', 'bar', {
+                    labels: stats.distance_per_year.labels,
+                    datasets: [{
+                        label: 'Distance (km)',
+                        data: stats.distance_per_year.values,
+                        backgroundColor: highlightColor,
+                        barPercentage: 0.6
+                    }]
+                }, {
+                    plugins: {
+                        tooltip: { callbacks: { label: ctx => ctx.parsed.y.toLocaleString() + ' km' } }
+                    },
+                    scales: { y: { ticks: { callback: value => value.toLocaleString() } } }
+                });
+            }
+
+            // Flights per Month
+            if (stats.flights_per_month) {
+                createChart('monthChart', 'bar', {
+                    labels: stats.flights_per_month.labels,
+                    datasets: [{
+                        label: 'Flights',
+                        data: stats.flights_per_month.values,
+                        backgroundColor: colors[1],
+                        barPercentage: 0.6
+                    }]
+                });
+            }
+
+            // Flight Durations
+            if (stats.duration_histogram) {
+                createChart('durationChart', 'bar', {
+                    labels: stats.duration_histogram.labels,
+                    datasets: [{
+                        label: 'Number of Flights',
+                        data: stats.duration_histogram.values,
+                        backgroundColor: accentColor,
+                        barPercentage: 0.8,
+                        categoryPercentage: 0.9
+                    }]
+                }, {
+                    scales: { x: { title: { display: true, text: 'Duration (hours)', font: { size: 10 } } } }
+                });
+
+                // Render flight lists
+                ['longest_flights', 'shortest_flights'].forEach(key => {
+                    if (stats[key]) {
+                        const divId = key === 'longest_flights' ? 'longestFlights' : 'shortestFlights';
+                        const div = document.getElementById(divId);
+                        stats[key].forEach(flight => {
+                            const item = document.createElement('div');
+                            item.className = 'list-item';
+                            item.innerHTML = renderFlightItem(flight);
+                            div.appendChild(item);
+                        });
+                    }
+                });
+            } else {
+                document.getElementById('durationSection').style.display = 'none';
+            }
+
+            // Plane Age Charts
+            if (stats.plane_age_distribution) {
+                // Render highlights
+                const highlightsDiv = document.getElementById('planeAgeHighlights');
+                ['youngest_plane_flight', 'oldest_plane_flight'].forEach(key => {
+                    if (stats[key]) {
+                        const flight = stats[key];
+                        const label = key === 'youngest_plane_flight' ? 'Youngest Aircraft' : 'Oldest Aircraft';
+                        highlightsDiv.innerHTML += `
+                            <div class="aircraft-card">
+                                <div class="aircraft-card-header">
+                                    <span class="aircraft-label">${label}</span>
+                                    <span class="aircraft-age-badge">${flight.age_years} years</span>
+                                </div>
+                                <div class="aircraft-flight-number">${flight.flight_number}</div>
+                                <div class="aircraft-model">${flight.aircraft_model}</div>
+                                <div class="aircraft-details">${flight.route} • ${flight.date}</div>
+                            </div>
+                        `;
+                    }
+                });
+
+                createChart('planeAgeChart', 'bar', {
+                    labels: stats.plane_age_distribution.labels.map(l => `${l}y`),
+                    datasets: [{
+                        label: 'Flights',
+                        data: stats.plane_age_distribution.values,
+                        backgroundColor: accentColor,
+                        barPercentage: 0.6
+                    }]
+                });
+
+                if (stats.plane_manufacturing_years) {
+                    createChart('manufacturingChart', 'line', {
+                        labels: stats.plane_manufacturing_years.labels,
+                        datasets: [{
+                            label: 'Planes',
+                            data: stats.plane_manufacturing_years.values,
+                            backgroundColor: highlightColor,
+                            borderColor: highlightColor,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            fill: false,
+                            tension: 0.1
+                        }]
+                    });
+                }
+            } else {
+                document.getElementById('planeAgeSection').style.display = 'none';
+            }
+
+            // Routes List - Use pre-formatted display data
+            if (stats.routes && stats.routes.items) {
+                window.showMoreRoutes = createShowMoreHandler(
+                    stats.routes.items,
+                    document.getElementById('routesList'),
+                    document.getElementById('routesShowMore'),
+                    (route, container) => {
+                        const card = document.createElement('div');
+                        card.className = 'route-card';
+                        card.innerHTML = `
+                            <div class="route-name">${route.display_name}</div>
+                            <div class="route-count">${route.display_count}</div>
+                            <div class="route-bar">
+                                <div class="route-bar-fill" style="width: ${route.bar_width}"></div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    }
+                );
+            }
+
+            // Airports Grid - Use enhanced data structure
+            if (stats.airports?.items) {
+                window.showMoreAirports = createShowMoreHandler(
+                    stats.airports.items,
+                    document.getElementById('airportsTable'),
+                    document.getElementById('airportsShowMore'),
+                    (airport, container) => {
+                        const card = document.createElement('div');
+                        card.className = 'airport-card';
+                        card.innerHTML = `
+                            <div class="airport-icon">${airport.iata}</div>
+                            <div class="airport-info">
+                                <div class="airport-name">${airport.name}</div>
+                                <div class="airport-visits"><strong>${airport.count}</strong> visits</div>
+                            </div>
+                        `;
+                        container.appendChild(card);
+                    }
+                );
+            }
+
+            // Repeated Aircraft
+            if (stats.repeated_aircraft && stats.repeated_aircraft.length > 0) {
+                const repeatedDiv = document.getElementById('repeatedAircraftList');
+                stats.repeated_aircraft.forEach(aircraft => {
+                    const item = document.createElement('div');
+                    item.className = 'list-item list-item-block';
+                    
+                    const flightsList = aircraft.flights.map(f => 
+                        `${f.flight_number} (${f.route}, ${f.date})`
+                    ).join('<br>');
+                    
+                    item.innerHTML = `
+                        <div class="list-item-header">
+                            <strong>${aircraft.registration}</strong>
+                            <span class="badge">${aircraft.count}x</span>
+                        </div>
+                        <div class="flight-info">${flightsList}</div>
+                    `;
+                    repeatedDiv.appendChild(item);
+                });
+            } else {
+                document.getElementById('repeatedAircraftSection').innerHTML = `
+                    <h2>Repeated Aircraft</h2>
+                    <p class="empty-message">No repeated aircraft found.</p>
+                `;
+            }
+
+            // Top Months - Simplified with forEach
+            if (stats.top_months) {
+                stats.top_months.slice(0, 12).forEach(month => {
+                    const card = document.createElement('div');
+                    card.className = 'month-card';
+                    card.innerHTML = `
+                        <div class="month-name">${month.month}</div>
+                        <div class="month-count">${month.count} flights</div>
+                    `;
+                    document.getElementById('topMonthsList').appendChild(card);
+                });
+            }
+        }
+
+        // Handle printing resizes for charts gracefully
+        window.addEventListener('beforeprint', () => {
+            for (let id in Chart.instances) {
+                Chart.instances[id].resize();
+            }
+        });
+
+        // Show Chrome print tip only in Chrome
+        if (/Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent)) {
+            const tip = document.querySelector('.print-tip');
+            if (tip) tip.classList.add('visible');
+        }
+
+        // Load stats on page load
+        loadStats();
+    </script>
+</body>
+</html>
