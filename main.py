@@ -65,16 +65,19 @@ def main():
         try:
             if bot is None:
                 bot = Bot()
-                bot.run()
+                bot.run(undetected=True)
             flight_info = bot.get_flight_info(flight_number=flight_number, date=date, iata_from=flight_data["from"],
                                               url=flight_data.get("url", None))
             print(flight_info)
             if len(flight_info) == 0:
                 print("No info!")
                 continue
-            plane_info = bot.get_plane_info(flight_info["registration_number"])
-            for k, v in plane_info.items():
-                flight_info[k] = v
+            if flight_info["registration_number"] != "Unknown":
+                plane_info = bot.get_plane_info(flight_info["registration_number"])
+                for k, v in plane_info.items():
+                    flight_info[k] = v
+            else:
+                print("Warning: Aircraft registration unknown, skipping plane info")
             flights_processed_data[key] = flight_info
             # Sort flights by date
             flights_processed_data = {k: v for k, v in sorted(flights_processed_data.items(),

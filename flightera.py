@@ -88,33 +88,9 @@ class Bot:
             except Exception as e:
                 pass
 
-            div_past_flights = self.wait_and_find_presence(By.XPATH, "//div[normalize-space()='PAST FLIGHTS']")
-            parent_div = div_past_flights.find_element(By.XPATH, "./..")
-            rows = parent_div.find_elements(By.XPATH, ".//tbody/tr")
-            details_link = None
-            for row in rows:
-                tds = row.find_elements(By.XPATH, "./td")
-                if len(tds) >= 3 and iata_from in tds[2].text:
-                    link_elements = tds[-1].find_elements(By.XPATH, "./a")
-                    if link_elements:
-                        details_link = link_elements[0]
-                        break
-            if details_link is None:
-                print("[ERROR] No dates found for %s departing from %s in %s" % (flight_number, iata_from, self._browser.current_url))
-                return {}
-            complete_url = details_link.get_attribute("href")
-            url_split = complete_url.split("/")
-            new_url = "/".join(url_split[:-1]) + "/" + date.strftime("%Y-%m-%d")
-            self._browser.get(new_url)
-            print("Went to %s" % new_url)
-
         time.sleep(2)
 
-        airport_divs = self._browser.find_elements(By.XPATH, ".//div[@class='flex flex-col items-center']")
-        if len(airport_divs) != 2:
-            print("[ERROR] No airports found in %s" % (self._browser.current_url))
-            return {}
-
+        # Extract JSON-LD flight data
         scripts = self._browser.find_elements(By.TAG_NAME, "script")
         json_dict = None
         for script in scripts:
@@ -122,48 +98,99 @@ class Bot:
                 parsed = json.loads(script.get_attribute("innerHTML"))
                 if isinstance(parsed, dict) and parsed.get("@type", "") == "Flight":
                     json_dict = parsed
-                    print("Found it!")
+                    print("Found Flight JSON-LD!")
                     break
             except (json.JSONDecodeError, Exception):
                 pass
+        
         if json_dict is None:
-            print("JSON not found :(")
+            print("JSON-LD Flight data not found :(")
             return {}
+        
         origin_airport = json_dict["departureAirport"]["iataCode"]
         destination_airport = json_dict["arrivalAirport"]["iataCode"]
-
-        flight_time = self._browser.find_element(By.XPATH, "//div[@itemprop='duration']").text.strip()
-        distance_text = self._browser.find_element(By.XPATH, "//div[@itemprop='distance']").text.strip()
-        distance_km = float(distance_text.split()[0].rstrip("km").replace(",", ""))
 
         if origin_airport != iata_from:
             raise Exception("Flight %s departing from %s, but found %s" % (flight_number, iata_from, origin_airport))
 
-        departure_time = self._browser.find_element(By.ID, "depTimeLiveHB").text.strip()
-        arrival_time = self._browser.find_element(By.ID, "arrTimeLiveHB").text.strip()
+        # Parse times from JSON-LD (ISO format)
+        departure_time_iso = json_dict.get("departureTime", "")
+        arrival_time_iso = json_dict.get("arrivalTime", "")
+        
+        # Extract time components
+        departure_time = ""
+        arrival_time = ""
+        try:
+            if departure_time_iso:
+                dt = datetime.datetime.fromisoformat(departure_time_iso.replace('Z', '+00:00'))
+                departure_time = dt.strftime("%H:%M")
+        except Exception:
+            pass
+        
+        try:
+            if arrival_time_iso:
+                dt = datetime.datetime.fromisoformat(arrival_time_iso.replace('Z', '+00:00'))
+                arrival_time = dt.strftime("%H:%M")
+        except Exception:
+            pass
 
-        if "aircraft" in json_dict:
-            aircraft_model = json_dict["aircraft"]["manufacturer"]["name"] + " " + json_dict["aircraft"]["name"]
-            registration_number = json_dict["aircraft"]["identifier"]
-        else:
-            aircraft_div = self._browser.find_element(By.XPATH, ".//div[@itemprop='aircraft']")
-            aircraft_model = aircraft_div.find_element(By.XPATH, ".//*[@itemprop='model']").text.strip()
-            registration_number = aircraft_div.find_element(By.XPATH, ".//*[@itemprop='identifier']").text.strip()
+        # Parse distance from flightDistance (e.g., "766 km")
+        distance_km = 0.0
+        try:
+            distance_str = json_dict.get("flightDistance", "0 km")
+            distance_km = float(distance_str.split()[0].replace(",", ""))
+        except Exception:
+            pass
 
+        # Try to extract flight duration - first try from JSON-LD, then from page
+        flight_minutes = 0
+        try:
+            # Try to find duration element on the page
+            duration_elem = self._browser.find_element(By.XPATH, "//div[@itemprop='duration']")
+            flight_time = duration_elem.text.strip()
+            flight_minutes = humantime2minutes(flight_time)
+        except Exception:
+            # If not found, try to calculate from times
+            try:
+                if departure_time_iso and arrival_time_iso:
+                    dep_dt = datetime.datetime.fromisoformat(departure_time_iso.replace('Z', '+00:00'))
+                    arr_dt = datetime.datetime.fromisoformat(arrival_time_iso.replace('Z', '+00:00'))
+                    flight_minutes = int((arr_dt - dep_dt).total_seconds() / 60)
+            except Exception:
+                pass
+
+        # Try to get aircraft info from JSON-LD or page
+        aircraft_model = "Unknown"
+        registration_number = "Unknown"
+        
+        if "aircraft" in json_dict and json_dict["aircraft"]:
+            try:
+                aircraft = json_dict["aircraft"]
+                if "manufacturer" in aircraft and "name" in aircraft:
+                    aircraft_model = aircraft.get("manufacturer", {}).get("name", "") + " " + aircraft.get("name", "")
+                registration_number = aircraft.get("identifier", "Unknown")
+            except Exception:
+                pass
+        
+        # If not in JSON, try to find on page
+        if aircraft_model == "Unknown" or registration_number == "Unknown":
+            try:
+                aircraft_div = self._browser.find_element(By.XPATH, ".//div[@itemprop='aircraft']")
+                if aircraft_model == "Unknown":
+                    aircraft_model = aircraft_div.find_element(By.XPATH, ".//*[@itemprop='model']").text.strip()
+                if registration_number == "Unknown":
+                    registration_number = aircraft_div.find_element(By.XPATH, ".//*[@itemprop='identifier']").text.strip()
+            except Exception:
+                pass
+
+        # Try to extract actual distance (ground distance vs flight distance)
+        actual_distance_km = -1.0
         try:
             div_actual_distance = self._browser.find_element(By.XPATH, ".//div[@itemprop='distance']")
-            """
-            <div class="text-sm text-slate-600 dark:text-gray-300" itemprop="distance">
-            <span class="whitespace-nowrap">
-                13,457km  / 8,306mi
-                <br>(Direct: 9,579km, +28%)
-            </span>
-            </div>
-            """
             actual_distance = div_actual_distance.text.strip()
             actual_distance_km = float(actual_distance.split()[0].rstrip("km ").replace(",", ""))
         except Exception:
-            actual_distance_km = -1.0
+            actual_distance_km = distance_km  # Use flight distance as fallback
 
         flight_info = {
             "flight_number": flight_number,
@@ -172,7 +199,7 @@ class Bot:
             "date": date.isoformat(),
             "departure_time": departure_time,
             "arrival_time": arrival_time,
-            "flight_minutes": humantime2minutes(flight_time),
+            "flight_minutes": flight_minutes,
             "distance_km": distance_km,
             "aircraft_model": aircraft_model,
             "registration_number": registration_number,
@@ -192,7 +219,23 @@ class Bot:
 
         time.sleep(2.0)
 
-        grid = self._browser.find_element(By.XPATH, ".//div[@class='grid grid-cols-2 md:grid-cols-3 gap-4 text-xs mt-6 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg']")
+        # Try to find the grid with better error handling and retries
+        grid = None
+        for attempt in range(3):
+            try:
+                grid = self._browser.find_element(By.XPATH, ".//div[@class='grid grid-cols-2 md:grid-cols-3 gap-4 text-xs mt-6 bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg']")
+                if grid:
+                    break
+            except Exception:
+                if attempt < 2:
+                    print(f"Grid not found on attempt {attempt + 1}, retrying...")
+                    time.sleep(2.0)
+                else:
+                    print("[ERROR] Could not find aircraft info grid")
+                    return {}
+        
+        if grid is None:
+            return {}
 
         mapping = {
             "STATUS": "aircraft_status",
@@ -203,27 +246,41 @@ class Bot:
             "FIRST FLIGHT": "aircraft_first_flight"
         }
         plane_info = {}
-        for cell in grid.find_elements(By.XPATH, ".//div[@class='text-center']"):
-            content = cell.text.strip()
-            # Content is a multiline string. The first line is the key in mapping dict
-            # The rest is the value of the entry
-            found = False
-            for key in mapping.keys():
-                if content.startswith(key):
-                    found = True
-                    break
-            if not found:
-                continue
+        try:
+            for cell in grid.find_elements(By.XPATH, ".//div[@class='text-center']"):
+                content = cell.text.strip()
+                if not content:
+                    continue
+                # Content is a multiline string. The first line is the key in mapping dict
+                # The rest is the value of the entry
+                found = False
+                for key in mapping.keys():
+                    if content.startswith(key):
+                        found = True
+                        break
+                if not found:
+                    continue
 
-            title = content.splitlines()[0].strip()
-            value = content.splitlines()[1].strip()
-            if title == "SEAT CONFIGURATION":
-                value = int(value.split()[0])
-            elif title == "FIRST FLIGHT":
-                first_flight_date = value.split(" (")[0]
-                value = datetime.datetime.strptime(first_flight_date, '%b %Y').isoformat()
+                title = content.splitlines()[0].strip()
+                if len(content.splitlines()) < 2:
+                    continue
+                value = content.splitlines()[1].strip()
+                if title == "SEAT CONFIGURATION":
+                    try:
+                        value = int(value.split()[0])
+                    except Exception:
+                        pass
+                elif title == "FIRST FLIGHT":
+                    try:
+                        first_flight_date = value.split(" (")[0]
+                        value = datetime.datetime.strptime(first_flight_date, '%b %Y').isoformat()
+                    except Exception:
+                        pass
 
-            plane_info[mapping[title]] = value
+                plane_info[mapping[title]] = value
+        except Exception as e:
+            print(f"[ERROR] Failed to parse plane info: {e}")
+            return plane_info
 
         print(plane_info)
         return plane_info
@@ -241,4 +298,10 @@ class Bot:
 
     def accept_cookies(self, timeout: float = 2.0) -> bool:
         assert self._browser is not None
+        try:
+            consentir_btn = self._browser.find_element(By.XPATH, "//p[contains(., 'Consentir')]")
+            consentir_btn.click()
+            time.sleep(1.0)
+        except Exception:
+            pass
         return True

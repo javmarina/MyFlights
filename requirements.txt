@@ -1,6 +1,7 @@
 # Web scraping and automation
-selenium==4.27.1
-undetected-chromedriver==3.5.5
+selenium>=4.27.1
+undetected-chromedriver>=3.5.5
+webdriver-manager
 
 # Country data
 pycountry==24.6.1
